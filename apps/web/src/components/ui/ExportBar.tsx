@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { downloadReport, type ReportMeta } from '@/lib/api';
+import { useToast } from '@/context/ToastContext';
 
 interface ExportBarProps {
   module: string;
@@ -10,30 +11,33 @@ interface ExportBarProps {
   projectName?: string;
 }
 
+const MODULE_NAMES: Record<string, string> = {
+  wenner: 'Resistividad Wenner', schlumberger: 'Resistividad Schlumberger',
+  nlayer: 'Modelo N capas', grid: 'Resistencia de malla',
+  conductor: 'Conductor IEEE 80', voltages: 'Tensiones paso/contacto',
+  gel: 'Gel químico', gpr: 'Potencial de tierra GPR',
+};
+
 export function ExportBar({ module, inputs, outputs, norm, projectName }: ExportBarProps) {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfOk, setPdfOk]           = useState(false);
-  const [err, setErr]               = useState<string | null>(null);
-
-  const MODULE_NAMES: Record<string, string> = {
-    wenner: 'Resistividad Wenner', schlumberger: 'Resistividad Schlumberger',
-    nlayer: 'Modelo N capas', grid: 'Resistencia de malla',
-    conductor: 'Conductor IEEE 80', voltages: 'Tensiones paso/contacto', gel: 'Gel químico',
-  };
+  const toast = useToast();
 
   async function handlePdf() {
-    setPdfLoading(true); setErr(null); setPdfOk(false);
+    setPdfLoading(true); setPdfOk(false);
     try {
       const meta: ReportMeta = {
         projectName: projectName ?? 'Sin proyecto',
-        projectCode: `GDP-${module.toUpperCase()}-${new Date().toISOString().slice(0,10)}`,
+        projectCode: `GDP-${module.toUpperCase()}-${new Date().toISOString().slice(0, 10)}`,
         engineer: 'Ingeniero de proyecto',
       };
       await downloadReport(meta, [{ module, inputs, outputs, norm }]);
       setPdfOk(true);
+      toast.success(`PDF "${MODULE_NAMES[module] ?? module}" generado y descargado`);
       setTimeout(() => setPdfOk(false), 3000);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Error al generar PDF');
+      const msg = e instanceof Error ? e.message : 'Error al generar PDF';
+      toast.error(msg);
     } finally { setPdfLoading(false); }
   }
 
@@ -53,8 +57,6 @@ export function ExportBar({ module, inputs, outputs, norm, projectName }: Export
       <span style={{ fontSize: 9, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
         {MODULE_NAMES[module] ?? module} · {norm ?? 'IEEE'}
       </span>
-
-      {err && <span style={{ fontSize: 9, color: 'var(--danger)' }}>{err}</span>}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { inputStyle } from '@/components/ui/CalcShared';
 
 const PLANS = [
@@ -14,6 +15,7 @@ const PLANS = [
 export function RegisterClient() {
   const { register } = useAuth();
   const router = useRouter();
+  const toast  = useToast();
   const [name, setName]         = useState('');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
@@ -27,9 +29,12 @@ export function RegisterClient() {
     setLoading(true); setError(null);
     try {
       await register(email, name, password);
+      toast.success('Cuenta creada. ¡Bienvenido a GroundDesing Pro!');
       router.push('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al crear cuenta');
+      const msg = err instanceof Error ? err.message : 'Error al crear cuenta';
+      setError(msg);
+      toast.error(msg);
     } finally { setLoading(false); }
   }
 

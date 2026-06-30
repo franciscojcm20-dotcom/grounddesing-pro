@@ -46,6 +46,12 @@ body {
 .safe { color: var(--safe); }
 .danger { color: var(--danger); }
 
+/* ── Toast animation ── */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
 /* ── Skeleton shimmer ── */
 @keyframes skeleton-shimmer {
   0%   { background-position: 200% 0; }

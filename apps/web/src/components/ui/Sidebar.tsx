@@ -23,6 +23,7 @@ const NAV = [
     group: 'Verificación',
     items: [
       { href: '/voltages', label: 'Tensiones paso/contacto' },
+      { href: '/gpr',      label: 'GPR — Potencial de tierra' },
     ],
   },
 ];

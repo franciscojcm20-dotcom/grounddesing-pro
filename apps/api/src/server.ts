@@ -7,6 +7,7 @@ import { routesSoil }      from './routes/soil.ts';
 import { routesGrid }      from './routes/grid.ts';
 import { routesConductor } from './routes/conductor.ts';
 import { routesVoltages }  from './routes/voltages.ts';
+import { routesGpr }       from './routes/gpr.ts';
 import { authRoutes }      from './routes/auth.ts';
 import { projectRoutes }   from './routes/projects.ts';
 import { reportRoutes }    from './routes/report.ts';
@@ -48,6 +49,7 @@ await app.register(routesSoil,      { prefix: '/api/v1/soil' });
 await app.register(routesGrid,      { prefix: '/api/v1/grid' });
 await app.register(routesConductor, { prefix: '/api/v1/conductor' });
 await app.register(routesVoltages,  { prefix: '/api/v1/voltages' });
+await app.register(routesGpr,       { prefix: '/api/v1/gpr' });
 
 // ─── Auth + Proyectos ─────────────────────────────────────────────────────────
 await app.register(authRoutes,    { prefix: '/api/v1/auth' });

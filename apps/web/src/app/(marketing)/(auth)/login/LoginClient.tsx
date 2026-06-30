@@ -3,11 +3,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { inputStyle } from '@/components/ui/CalcShared';
 
 export function LoginClient() {
   const { login } = useAuth();
   const router = useRouter();
+  const toast  = useToast();
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState<string | null>(null);
@@ -18,9 +20,12 @@ export function LoginClient() {
     setLoading(true); setError(null);
     try {
       await login(email, password);
+      toast.success('Sesión iniciada correctamente');
       router.push('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
+      const msg = err instanceof Error ? err.message : 'Error al iniciar sesión';
+      setError(msg);
+      toast.error(msg);
     } finally { setLoading(false); }
   }
 
