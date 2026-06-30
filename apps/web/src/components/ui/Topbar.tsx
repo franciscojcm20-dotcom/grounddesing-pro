@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 
 const PLAN_COLOR: Record<string, { bg: string; border: string; text: string }> = {
   community:    { bg: '#0d1220', border: '#3b82f633', text: '#93c5fd' },
@@ -14,6 +15,7 @@ export function Topbar() {
   const { user, logout } = useAuth();
   const router   = useRouter();
   const pathname = usePathname();
+  const toast    = useToast();
   const [open, setOpen]         = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const dropRef  = useRef<HTMLDivElement>(null);
@@ -37,6 +39,7 @@ export function Topbar() {
   async function handleLogout() {
     setOpen(false);
     await logout();
+    toast.info('Sesión cerrada');
     router.push('/');
   }
 

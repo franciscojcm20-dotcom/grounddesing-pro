@@ -10,6 +10,7 @@ const MODULES = [
   { href: '/conductor',         icon: '〰', label: 'Conductor IEEE 80',         norm: 'IEEE 80-2013 · Cl. 11.3' },
   { href: '/voltages',          icon: '⚠',  label: 'Tensiones paso/contacto',   norm: 'IEEE 80-2013 · Cl. 16' },
   { href: '/grid/gel',          icon: '🧪', label: 'Aditivo gel químico',       norm: 'Dwight / Sunde' },
+  { href: '/gpr',               icon: '⚡', label: 'GPR — Potencial de tierra', norm: 'IEEE 80-2013 · Cl. 15' },
 ];
 
 export function DashboardClient() {
