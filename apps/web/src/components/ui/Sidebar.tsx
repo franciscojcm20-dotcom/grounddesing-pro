@@ -79,6 +79,18 @@ export function Sidebar() {
         </div>
       ))}
 
+      <div style={{ padding: '0 0 8px' }}>
+        <Link href="/settings" style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 14px', fontSize: 11,
+          color: path === '/settings' ? 'var(--copper)' : 'var(--faint)',
+          background: path === '/settings' ? 'var(--copper-soft)' : 'transparent',
+          textDecoration: 'none',
+        }}>
+          <span style={{ fontSize: 11 }}>⚙</span> Configuración
+        </Link>
+      </div>
+
       <div style={{ marginTop: 'auto', padding: '14px', borderTop: '1px solid var(--line)' }}>
         <div style={{ fontSize: 8.5, color: 'var(--faint)', marginBottom: 6 }}>Norma activa</div>
         <div style={{ fontSize: 9, color: 'var(--copper)', fontFamily: 'var(--font-mono)', lineHeight: 1.6 }}>

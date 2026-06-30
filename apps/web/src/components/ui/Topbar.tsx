@@ -125,9 +125,10 @@ export function Topbar() {
                 <div style={{ fontSize: 9.5, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>{user.email}</div>
               </div>
 
-              <DropItem href="/profile"  icon="👤" label="Mi perfil" />
-              <DropItem href="/projects" icon="📁" label="Proyectos" />
-              <DropItem href="/pricing"  icon="⬆" label="Mejorar plan" />
+              <DropItem href="/profile"   icon="👤" label="Mi perfil" />
+              <DropItem href="/projects"  icon="📁" label="Proyectos" />
+              <DropItem href="/settings"  icon="⚙" label="Configuración" />
+              <DropItem href="/pricing"   icon="⬆" label="Mejorar plan" />
 
               <div style={{ borderTop: '1px solid var(--line)', margin: '6px 0' }} />
               <button
