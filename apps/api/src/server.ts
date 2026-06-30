@@ -9,9 +9,10 @@ import { routesConductor } from './routes/conductor.ts';
 import { routesVoltages }  from './routes/voltages.ts';
 import { authRoutes }      from './routes/auth.ts';
 import { projectRoutes }   from './routes/projects.ts';
+import { reportRoutes }    from './routes/report.ts';
 
-const PORT     = Number(process.env.PORT ?? 3001);
-const HOST     = process.env.HOST ?? '0.0.0.0';
+const PORT       = Number(process.env.PORT ?? 3001);
+const HOST       = process.env.HOST ?? '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-production';
 
 const app = Fastify({ logger: { level: 'info' } });
@@ -26,7 +27,6 @@ await app.register(jwt, {
   cookie: { cookieName: 'token', signed: false },
 });
 
-// Decorator used by protected routes
 app.decorate('authenticate', async function (req: Parameters<typeof app.authenticate>[0], reply: Parameters<typeof app.authenticate>[1]) {
   try {
     await req.jwtVerify();
@@ -38,8 +38,9 @@ app.decorate('authenticate', async function (req: Parameters<typeof app.authenti
 // ─── Health ───────────────────────────────────────────────────────────────────
 app.get('/health', async () => ({
   status: 'ok',
-  version: '0.2.0',
+  version: '0.3.0',
   engines: '@gdp/engines-math@0.1.0',
+  pdf: '@gdp/pdf-engine@0.1.0',
 }));
 
 // ─── Motores de cálculo ───────────────────────────────────────────────────────
@@ -51,6 +52,9 @@ await app.register(routesVoltages,  { prefix: '/api/v1/voltages' });
 // ─── Auth + Proyectos ─────────────────────────────────────────────────────────
 await app.register(authRoutes,    { prefix: '/api/v1/auth' });
 await app.register(projectRoutes, { prefix: '/api/v1/projects' });
+
+// ─── Reporte PDF ──────────────────────────────────────────────────────────────
+await app.register(reportRoutes, { prefix: '/api/v1/report' });
 
 try {
   await app.listen({ port: PORT, host: HOST });
