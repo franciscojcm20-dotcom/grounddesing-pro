@@ -77,6 +77,36 @@ export interface VoltagesRealResult {
   norm: string;
 }
 
+// ─── PDF Report ───────────────────────────────────────────────────────────────
+
+export interface ReportMeta {
+  projectName: string;
+  projectCode?: string;
+  company?: string;
+  engineer?: string;
+  location?: string;
+  date?: string;
+}
+
+export async function downloadReport(
+  meta: ReportMeta,
+  sections: Array<{ module: string; inputs: Record<string, unknown>; outputs: Record<string, unknown>; norm?: string }>,
+): Promise<void> {
+  const res = await fetch(`${BASE}/api/v1/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ meta, sections }),
+  });
+  if (!res.ok) throw new Error('Error al generar PDF');
+  const blob = await res.blob();
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `GDP-${meta.projectCode ?? 'report'}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── Llamadas ─────────────────────────────────────────────────────────────────
 
 export const api = {

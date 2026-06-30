@@ -5,6 +5,7 @@ import { routesSoil }      from './routes/soil.ts';
 import { routesGrid }      from './routes/grid.ts';
 import { routesConductor } from './routes/conductor.ts';
 import { routesVoltages }  from './routes/voltages.ts';
+import { reportRoutes }    from './routes/report.ts';
 
 const PORT = Number(process.env.PORT ?? 3001);
 const HOST = process.env.HOST ?? '0.0.0.0';
@@ -16,8 +17,9 @@ await app.register(cors, { origin: true });
 // ─── Health ───────────────────────────────────────────────────────────────────
 app.get('/health', async () => ({
   status: 'ok',
-  version: '0.1.0',
+  version: '0.2.0',
   engines: '@gdp/engines-math@0.1.0',
+  pdf: '@gdp/pdf-engine@0.1.0',
 }));
 
 // ─── Motores de cálculo ───────────────────────────────────────────────────────
@@ -25,6 +27,9 @@ await app.register(routesSoil,      { prefix: '/api/v1/soil' });
 await app.register(routesGrid,      { prefix: '/api/v1/grid' });
 await app.register(routesConductor, { prefix: '/api/v1/conductor' });
 await app.register(routesVoltages,  { prefix: '/api/v1/voltages' });
+
+// ─── Reporte PDF ──────────────────────────────────────────────────────────────
+await app.register(reportRoutes, { prefix: '/api/v1/report' });
 
 try {
   await app.listen({ port: PORT, host: HOST });
