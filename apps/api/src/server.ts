@@ -13,6 +13,7 @@ import { authRoutes }      from './routes/auth.ts';
 import { projectRoutes }   from './routes/projects.ts';
 import { reportRoutes }    from './routes/report.ts';
 import { adminRoutes }     from './routes/admin.ts';
+import { billingRoutes }   from './routes/billing.ts';
 
 const PORT       = Number(process.env.PORT ?? 3001);
 const HOST       = process.env.HOST ?? '0.0.0.0';
@@ -69,6 +70,9 @@ await app.register(reportRoutes, { prefix: '/api/v1/report' });
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 await app.register(adminRoutes, { prefix: '/api/v1/admin' });
+
+// ─── Billing (Stripe) ─────────────────────────────────────────────────────────
+await app.register(billingRoutes, { prefix: '/api/v1/billing' });
 
 try {
   await app.listen({ port: PORT, host: HOST });
