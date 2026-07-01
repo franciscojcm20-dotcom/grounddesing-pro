@@ -4,6 +4,31 @@ export const metadata = { title: 'Changelog — GroundDesing Pro' };
 
 const RELEASES = [
   {
+    version: 'v0.22',
+    date: '2026-06-30',
+    tag: 'fase 26',
+    items: [
+      'Módulo Protección contra Rayos (SPR) — IEC 62305-2/3 y NFPA 780',
+      'Método de esfera rodante interactivo con 4 niveles LPS (r = 20/30/45/60 m)',
+      'Evaluación de riesgo: Ad, Nd, NT, eficiencia requerida E',
+      'Diagrama SVG de alzado con zona de protección y esfera rodante',
+      'Cálculo de conductores descendentes mínimos per NFPA 780 §4.7',
+      'Adapter lightning en API de reportes PDF',
+    ],
+  },
+  {
+    version: 'v0.21',
+    date: '2026-06-30',
+    tag: 'fase 24-25',
+    items: [
+      'PDF engine v2: página de portada con tabla de cumplimiento resumen',
+      'Filas alternadas en tablas de inputs/results, borders y accents',
+      'Edición de nombre inline en perfil sin recargar página',
+      'Formulario cambio de contraseña con medidor de fortaleza',
+      'PUT /api/v1/auth/me: actualiza nombre y contraseña con validación bcrypt',
+    ],
+  },
+  {
     version: 'v0.18',
     date: '2026-06-30',
     tag: 'fase 19',

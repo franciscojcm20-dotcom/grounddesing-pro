@@ -382,3 +382,114 @@ export function computeConductor(c: ConductorInput): ConductorResult {
   const margen = ((seleccionado.mm2 - r.areaMm2) / r.areaMm2) * 100;
   return { ...r, sugerido, seleccionado, esSeleccionManual, calibreSubdimensionado, margen };
 }
+
+// ─── Lightning Protection — Rolling Sphere / NFPA 780 / IEC 62305 ────────────
+
+/** LPS protection level → rolling sphere radius (m) per IEC 62305-3 Table 2 */
+export const ROLLING_SPHERE_RADIUS: Record<string, number> = {
+  'I':   20,
+  'II':  30,
+  'III': 45,
+  'IV':  60,
+};
+
+/** Collection area of an isolated structure per IEC 62305-2 Annex A (simplified) */
+export function collectionArea(length: number, width: number, height: number): number {
+  // Ad = L·W + 2·(L+W)·H + π·H²
+  return length * width + 2 * (length + width) * height + Math.PI * height * height;
+}
+
+/** Annual flash density from ground flash density Ng (flashes/km²/yr) */
+export function annualStrikes(Ad_m2: number, Ng: number): number {
+  return Ng * Ad_m2 * 1e-6; // convert m² → km²
+}
+
+/** Tolerable frequency of dangerous events per IEC 62305-2 */
+export const TOLERABLE_FREQUENCY: Record<string, number> = {
+  'dwelling':    1e-3,
+  'farm':        1e-3,
+  'industry':    1e-4,
+  'public':      1e-5,
+  'hospital':    1e-5,
+  'heritage':    1e-3,
+};
+
+export interface LightningInput {
+  structureLength:  number;   // m
+  structureWidth:   number;   // m
+  structureHeight:  number;   // m
+  groundFlashDensity: number; // Ng, flashes/km²/yr (typical 1-10)
+  lpsLevel:         'I' | 'II' | 'III' | 'IV';
+  occupancyType:    keyof typeof TOLERABLE_FREQUENCY;
+  environmentFactor?: number; // Cd: 0.25 isolated hilltop, 0.5 rural, 1.0 urban, 2.0 dense
+}
+
+export interface ProtectionZone {
+  level: string;
+  radius: number;
+  /** Points on the arc of the rolling sphere for SVG rendering [x, y][] */
+  arcPoints: Array<[number, number]>;
+}
+
+export interface LightningResult {
+  rollingSphereRadius: number;   // m
+  collectionAreaM2:    number;
+  annualStrikes:       number;   // Nd
+  tolerableFrequency:  number;   // NT
+  protectionRequired:  boolean;
+  efficiencyRequired:  number;   // E = 1 - NT/Nd (0 if not needed)
+  recommendedLevel:    string;
+  zones: ProtectionZone[];
+  downConductors:      number;   // minimum per NFPA 780 §4.7
+  groundTerminations:  number;
+}
+
+export function computeLightning(p: LightningInput): LightningResult {
+  const Cd  = p.environmentFactor ?? 1.0;
+  const Ad  = collectionArea(p.structureLength, p.structureWidth, p.structureHeight);
+  const Nd  = annualStrikes(Ad, p.groundFlashDensity) * Cd;
+  const NT  = TOLERABLE_FREQUENCY[p.occupancyType] ?? 1e-3;
+  const protectionRequired = Nd > NT;
+  const efficiencyRequired = protectionRequired ? Math.max(0, 1 - NT / Nd) : 0;
+
+  // Recommend level based on required efficiency (IEC 62305-2 Table 2)
+  let recommendedLevel = 'IV';
+  if (efficiencyRequired >= 0.98) recommendedLevel = 'I';
+  else if (efficiencyRequired >= 0.95) recommendedLevel = 'II';
+  else if (efficiencyRequired >= 0.90) recommendedLevel = 'III';
+
+  const radius = ROLLING_SPHERE_RADIUS[p.lpsLevel]!;
+
+  // Arc points for rolling sphere cross-section (elevation view, normalized to structure height)
+  // Sphere rolls along roof; contact point at edge gives protected zone arc
+  const H = p.structureHeight;
+  const arcPoints: Array<[number, number]> = [];
+  for (let deg = -90; deg <= 90; deg += 5) {
+    const rad = (deg * Math.PI) / 180;
+    arcPoints.push([radius * Math.cos(rad), H + radius - radius * Math.sin(Math.abs(rad))]);
+  }
+
+  // Zones: zone 0A (unprotected), 0B (partially), 1 (protected)
+  const zones: ProtectionZone[] = [
+    { level: 'LPZ 0A', radius: 0, arcPoints: [] },
+    { level: `LPZ 1 (r = ${radius} m)`, radius, arcPoints },
+  ];
+
+  // Minimum down conductors: perimeter / 10m spacing (NFPA 780 §4.7.2), min 2
+  const perimeter = 2 * (p.structureLength + p.structureWidth);
+  const downConductors = Math.max(2, Math.ceil(perimeter / 10));
+  const groundTerminations = downConductors;
+
+  return {
+    rollingSphereRadius: radius,
+    collectionAreaM2: Ad,
+    annualStrikes: Nd,
+    tolerableFrequency: NT,
+    protectionRequired,
+    efficiencyRequired,
+    recommendedLevel,
+    zones,
+    downConductors,
+    groundTerminations,
+  };
+}

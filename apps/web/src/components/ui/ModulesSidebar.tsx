@@ -17,6 +17,7 @@ const MODULES = [
     { label: 'Conductor',    href: '/conductor',         icon: '〰' },
     { label: 'Tensiones',    href: '/voltages',          icon: '⚠' },
     { label: 'GPR',          href: '/gpr',               icon: '⏚' },
+    { label: 'Rayos (SPR)',  href: '/lightning',         icon: '⚡' },
   ]},
 ];
 
