@@ -8,8 +8,9 @@ CREATE TABLE IF NOT EXISTS users (
   email       TEXT NOT NULL UNIQUE,
   name        TEXT NOT NULL,
   password_hash TEXT NOT NULL,
-  plan        TEXT NOT NULL DEFAULT 'community' CHECK (plan IN ('community','individual','professional')),
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  plan               TEXT NOT NULL DEFAULT 'community' CHECK (plan IN ('community','individual','professional')),
+  stripe_customer_id TEXT UNIQUE,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS projects (
