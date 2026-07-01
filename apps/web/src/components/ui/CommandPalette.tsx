@@ -15,6 +15,7 @@ const COMMANDS = [
   { id: 'voltages',     label: 'Tensiones paso/contacto',   icon: '⚠', href: '/voltages',           group: 'Módulos' },
   { id: 'gel',          label: 'Gel químico',                icon: '🧪', href: '/grid/gel',          group: 'Módulos' },
   { id: 'gpr',          label: 'GPR — Potencial de tierra', icon: '⚡', href: '/gpr',               group: 'Módulos' },
+  { id: 'lightning',    label: 'Rayos — SPR IEC 62305',     icon: '🌩', href: '/lightning',          group: 'Módulos' },
   { id: 'pricing',      label: 'Precios y planes',           icon: '💎', href: '/pricing',           group: 'Información' },
   { id: 'changelog',   label: 'Changelog — versiones',      icon: '📋', href: '/changelog',         group: 'Información' },
   { id: 'admin',       label: 'Panel de administración',    icon: '🛡', href: '/admin',             group: 'Sistema' },

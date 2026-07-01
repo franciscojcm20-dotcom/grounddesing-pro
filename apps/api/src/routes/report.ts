@@ -118,11 +118,46 @@ function voltagesSection(inputs: Record<string, unknown>, outputs: Record<string
   };
 }
 
+
+function lightningSection(inputs: Record<string, unknown>, outputs: Record<string, unknown>): ReportSection {
+  const pReq = Boolean(outputs['protectionRequired']);
+  return {
+    title: 'Protección contra rayos — Esfera rodante',
+    norm: 'IEC 62305-2/3 · NFPA 780',
+    inputs: [
+      { label: 'Largo estructura',       value: Number(inputs['structureLength']).toFixed(0),      unit: 'm'  },
+      { label: 'Ancho estructura',       value: Number(inputs['structureWidth']).toFixed(0),       unit: 'm'  },
+      { label: 'Altura estructura',      value: Number(inputs['structureHeight']).toFixed(0),      unit: 'm'  },
+      { label: 'Densidad descargas Ng',  value: Number(inputs['groundFlashDensity']).toFixed(1),  unit: 'desc/km²/año' },
+      { label: 'Nivel LPS',             value: String(inputs['lpsLevel']),                         unit: ''   },
+      { label: 'Factor entorno Cd',      value: Number(inputs['environmentFactor'] ?? 1).toFixed(2), unit: '' },
+    ],
+    results: [
+      { label: 'Radio esfera rodante r', value: Number(outputs['rollingSphereRadius']).toFixed(0), unit: 'm',  highlight: true },
+      { label: 'Área captación Ad',      value: Number(outputs['collectionAreaM2']).toFixed(0),    unit: 'm²' },
+      { label: 'Frecuencia anual Nd',    value: Number(outputs['annualStrikes']).toFixed(4),       unit: ''   },
+      { label: 'Frec. tolerable NT',     value: Number(outputs['tolerableFrequency']).toExponential(0), unit: '' },
+      { label: 'Eficiencia requerida E', value: `${(Number(outputs['efficiencyRequired']) * 100).toFixed(1)} %`, unit: '', highlight: pReq },
+      { label: 'Nivel LPS recomendado',  value: `LPS ${outputs['recommendedLevel']}`,             unit: ''   },
+      { label: 'Conductores descendentes', value: String(outputs['downConductors']),               unit: ''   },
+    ],
+    pass: !pReq,
+    passLabel: pReq
+      ? `Nd > NT — SE REQUIERE SPR nivel LPS ${outputs['recommendedLevel']}`
+      : 'Nd ≤ NT — No se requiere sistema de protección contra rayos',
+    observations: [
+      'Método esfera rodante per IEC 62305-3 Tabla 2 y NFPA 780 §4.3',
+      `Área de captación: Ad = L·W + 2·(L+W)·H + π·H² = ${Number(outputs['collectionAreaM2']).toFixed(0)} m²`,
+    ],
+  };
+}
+
 const ADAPTERS: Record<string, (i: Record<string, unknown>, o: Record<string, unknown>) => ReportSection> = {
   wenner:     wennerSection,
   grid:       gridSection,
   conductor:  conductorSection,
   voltages:   voltagesSection,
+  lightning:  lightningSection,
 };
 
 // ─── Route ────────────────────────────────────────────────────────────────────
