@@ -1,8 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/context/ToastContext';
-
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+import { API_BASE as BASE } from '@/lib/apiBase';
 
 interface Project { id: string; name: string; description?: string }
 
@@ -90,7 +89,7 @@ export function SaveToProjectModal({ module, inputs, outputs, norm, onClose, onS
       style={{ position: 'fixed', inset: 0, zIndex: 8000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#00000066' }}
       onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ width: '100%', maxWidth: 420, background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 6, boxShadow: '0 20px 60px #00000055', overflow: 'hidden' }}>
+      <div style={{ width: '100%', maxWidth: 420, background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 6, boxShadow: 'var(--shadow)', overflow: 'hidden' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--line)' }}>
           <div>

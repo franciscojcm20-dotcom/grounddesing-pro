@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { useI18n, type Locale } from '@/context/I18nContext';
+import { useI18n, type Locale, LOCALES } from '@/context/I18nContext';
 import { useToast } from '@/context/ToastContext';
 import { AuthGuard } from '@/components/ui/AuthGuard';
 
@@ -100,7 +100,7 @@ function SettingsContent() {
           </div>
           <div style={{
             marginLeft: 'auto', fontSize: 9.5, padding: '3px 10px', borderRadius: 10,
-            background: '#1a1508', border: '1px solid #f59e0b33', color: 'var(--warn)',
+            background: 'var(--warn-soft)', border: '1px solid var(--warn)', color: 'var(--warn)',
             textTransform: 'uppercase', letterSpacing: '.05em',
           }}>
             {user?.plan ?? 'community'}
@@ -111,21 +111,18 @@ function SettingsContent() {
       {/* Preferences */}
       <section style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 6, padding: '16px 20px', marginBottom: 24 }}>
         <div style={{ fontSize: 10, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>
-          Preferencias
+          {t('preferences')}
         </div>
 
-        <SettingRow label={t('lang')} description="Idioma de la interfaz">
+        <SettingRow label={t('lang')} description={t('langDesc')}>
           <Select
             value={locale}
             onChange={v => setLocale(v as Locale)}
-            options={[
-              { value: 'es', label: '🇨🇱  Español' },
-              { value: 'en', label: '🇺🇸  English' },
-            ]}
+            options={LOCALES.map(l => ({ value: l.value, label: `${l.flag}  ${l.label}` }))}
           />
         </SettingRow>
 
-        <SettingRow label={t('norm')} description="Normativa usada en todos los módulos">
+        <SettingRow label={t('norm')} description={t('normDesc')}>
           <Select
             value={activeNorm}
             onChange={setActiveNorm}
@@ -140,11 +137,11 @@ function SettingsContent() {
           {t('notifications')}
         </div>
 
-        <SettingRow label="Resumen semanal por email" description="Recibe un resumen de tus proyectos activos">
+        <SettingRow label={t('weeklyDigest')} description={t('weeklyDigestDesc')}>
           <Toggle checked={emailNotif} onChange={setEmailNotif} />
         </SettingRow>
 
-        <SettingRow label="Adjuntar PDF en email" description="Incluye el PDF del reporte en el correo">
+        <SettingRow label={t('attachPdf')} description={t('attachPdfDesc')}>
           <Toggle checked={pdfAttach} onChange={setPdfAttach} />
         </SettingRow>
       </section>
