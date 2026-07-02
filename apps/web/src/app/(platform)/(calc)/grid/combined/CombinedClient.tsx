@@ -1,17 +1,24 @@
 'use client';
 import { useState } from 'react';
-import { api, type CombinedResult } from '@/lib/api';
+import { api, type CombinedResult, type CombinedOptimizeResult } from '@/lib/api';
 import {
   Field, SectionLabel, StatCard, CompBanner,
   calcLayout, inputStyle, panelStyle, Th, TdMono,
 } from '@/components/ui/CalcShared';
 import { ExportBar } from '@/components/ui/ExportBar';
+import { SoilRhoField } from '@/components/ui/SoilRhoField';
+import { GelPanel } from '@/components/ui/GelPanel';
+import { ConductorPanel } from '@/components/ui/ConductorPanel';
+import { DiagnosisPanel, type ComplianceCheck } from '@/components/ui/DiagnosisPanel';
+import { FaultCurrentField } from '@/components/ui/FaultCurrentField';
+import { useFaultAnalysis } from '@/context/FaultAnalysisContext';
+import type { GelParams } from '@/lib/api';
 
 const DEFAULTS = {
   rho: 110, largo: 40, ancho: 30, profundidad: 0.6,
   nConductoresL: 7, nConductoresW: 5,
   nRods: 12, rodLength: 3, rodDiamMm: 16, rodSpacing: 6,
-  iFalla: 8500,
+  iFalla: 8500, tFalla: 0.5,
 };
 
 function CombinedDiagram({ largo, ancho, nL, nW, nRods }: { largo: number; ancho: number; nL: number; nW: number; nRods: number }) {
@@ -52,10 +59,14 @@ function CombinedDiagram({ largo, ancho, nL, nW, nRods }: { largo: number; ancho
 }
 
 export function CombinedClient() {
+  const faultAnalysis = useFaultAnalysis();
   const [form, setForm] = useState(DEFAULTS);
+  const [gel, setGel] = useState<GelParams | null>(null);
   const [result, setResult] = useState<CombinedResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [optimizing, setOptimizing] = useState(false);
+  const [optimizeResult, setOptimizeResult] = useState<CombinedOptimizeResult | null>(null);
 
   const set = (k: keyof typeof DEFAULTS) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [k]: parseFloat(e.target.value) || 0 }));
@@ -64,25 +75,73 @@ export function CombinedClient() {
   const condLen = form.nConductoresL * form.ancho + form.nConductoresW * form.largo;
   const condRod = form.nRods * form.rodLength;
   const Ltotal  = condLen + condRod;
+  function rodRadiusOf() { return (form.rodDiamMm / 1000) / 2; }
 
   async function calculate() {
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setOptimizeResult(null);
     try {
       const res = await api.grid.combined({
         rho: form.rho, area, Ltotal, depth: form.profundidad,
         nRods: Math.round(form.nRods), rodLength: form.rodLength,
-        rodRadius: (form.rodDiamMm / 1000) / 2, rodSpacing: form.rodSpacing,
+        rodRadius: rodRadiusOf(), rodSpacing: form.rodSpacing,
         iFalla: form.iFalla,
+        ...(gel ? { gel } : {}),
       });
       setResult(res);
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
   }
 
+  async function optimize() {
+    if (!result) return;
+    setOptimizing(true);
+    try {
+      const targetRg = result.compliance.rg1 ? 1 : 5;
+      const r = await api.grid.combinedOptimize({
+        rho: form.rho, area, Ltotal, depth: form.profundidad,
+        nRods: Math.round(form.nRods), rodLength: form.rodLength,
+        rodRadius: rodRadiusOf(), rodSpacing: form.rodSpacing,
+        iFalla: form.iFalla, targetRg,
+        ...(gel ? { gel } : {}),
+      });
+      setOptimizeResult(r);
+    } catch (e) { setError((e as Error).message); }
+    finally { setOptimizing(false); }
+  }
+
+  function applySuggested() {
+    if (!optimizeResult) return;
+    const s = optimizeResult.suggested;
+    const areaScale = area > 0 ? Math.sqrt(s.area / area) : 1;
+    setForm(f => ({
+      ...f, rho: s.rho, profundidad: s.depth,
+      largo: Math.round(f.largo * areaScale * 10) / 10,
+      ancho: Math.round(f.ancho * areaScale * 10) / 10,
+      nRods: s.nRods, rodLength: s.rodLength,
+      rodDiamMm: Math.round(s.rodRadius * 2000 * 10) / 10,
+      rodSpacing: s.rodSpacing, iFalla: s.iFalla,
+    }));
+    setOptimizeResult(null);
+  }
+
+  const complianceChecks: ComplianceCheck[] = result ? [
+    { label: 'Rc ≤ 1 Ω (subestaciones críticas)', pass: result.compliance.rg1, detail: `Rc calculada = ${result.Rc.toFixed(3)} Ω (mejora ${result.mejora.toFixed(1)}% vs malla sola).` },
+    { label: 'Rc ≤ 5 Ω (uso general)', pass: result.compliance.rg5, detail: `Rc calculada = ${result.Rc.toFixed(3)} Ω.` },
+  ] : [];
+  const diagnosis: string[] = [];
+  const dataQuality: string[] = [];
+  if (result && !result.compliance.rg1) {
+    diagnosis.push(`Rc = ${result.Rc.toFixed(3)} Ω supera 1 Ω: Rc combina Rg (malla, ${result.Rg.toFixed(3)} Ω) y Rr (picas, ${result.Rr.toFixed(3)} Ω) según Schwarz; ambas resistencias siguen siendo altas para la ρ del sitio.`);
+    if (form.nRods < 8) diagnosis.push(`Solo hay ${Math.round(form.nRods)} picas adicionales; aumentar su número y longitud reduce Rr sin requerir más área de malla.`);
+  }
+  if (result && result.rhoUsado !== undefined && result.rhoUsado > 500) {
+    dataQuality.push(`ρ = ${result.rhoUsado.toFixed(0)} Ω·m es inusualmente alto; revisa las mediciones de campo antes de dimensionar en base a este valor.`);
+  }
+
   return (
     <div style={calcLayout}>
       <aside style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <ExportBar module="combined" inputs={{ ...form, area, Ltotal }} outputs={result ?? {}} norm="Schwarz (1954) — IEEE 80-2013 §14.5" />
+        <ExportBar module="combined" inputs={{ ...form, area, Ltotal }} outputs={(result ?? {}) as unknown as Record<string,unknown>} norm="Schwarz (1954) — IEEE 80-2013 §14.5" />
 
         <div style={panelStyle}>
           <SectionLabel>Malla rectangular</SectionLabel>
@@ -103,15 +162,21 @@ export function CombinedClient() {
 
         <div style={panelStyle}>
           <SectionLabel>Sistema eléctrico</SectionLabel>
-          <Field label="Resistividad ρ (Ω·m)"><input style={inputStyle} type="number" value={form.rho} onChange={set('rho')} /></Field>
-          <Field label="Corriente de falla Ig (A)"><input style={inputStyle} type="number" value={form.iFalla} onChange={set('iFalla')} /></Field>
+          <SoilRhoField value={form.rho} onChange={v => setForm(f => ({ ...f, rho: v }))} />
+          <FaultCurrentField onSync={v => setForm(f => ({ ...f, iFalla: v }))} />
+          <Field label="Tiempo de despeje (s)"><input style={inputStyle} type="number" step="0.1" value={form.tFalla} onChange={set('tFalla')} /></Field>
         </div>
 
-        <button onClick={calculate} disabled={loading}
-          style={{ padding: '10px 0', background: 'var(--copper)', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: loading ? .6 : 1 }}>
+        <div style={panelStyle}>
+          <GelPanel rhoSuelo={form.rho} onChange={setGel} />
+          <ConductorPanel iFalla={form.iFalla} tFalla={form.tFalla} onChange={(diamMm) => setForm(f => ({ ...f, rodDiamMm: Math.round(diamMm * 10) / 10 }))} />
+        </div>
+
+        <button onClick={calculate} disabled={loading || !faultAnalysis.result}
+          style={{ padding: '10px 0', background: 'var(--copper)', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: (loading || !faultAnalysis.result) ? .6 : 1 }}>
           {loading ? 'Calculando…' : 'Calcular (Schwarz)'}
         </button>
-        {error && <div style={{ color: 'var(--red)', fontSize: 12 }}>{error}</div>}
+        {error && <div style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</div>}
       </aside>
 
       <main style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -124,6 +189,7 @@ export function CombinedClient() {
             <CompBanner
               pass={result.compliance.rg1 || result.compliance.rg5}
               label={`Rc = ${result.Rc.toFixed(3)} Ω — mejora ${result.mejora.toFixed(1)}% vs malla sola`}
+              norm="Schwarz (1954) — IEEE 80-2013 §14.5"
             />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
               <StatCard label="Rg — malla sola (Sverak)" value={`${result.Rg.toFixed(3)} Ω`} />
@@ -151,15 +217,32 @@ export function CombinedClient() {
                 <tbody>
                   <tr>
                     <TdMono>Subestaciones críticas</TdMono><TdMono>{result.Rc.toFixed(3)} Ω</TdMono><TdMono>≤ 1 Ω</TdMono>
-                    <TdMono style={{ color: result.compliance.rg1 ? 'var(--green)' : 'var(--red)' }}>{result.compliance.rg1 ? '✓ OK' : '✗'}</TdMono>
+                    <TdMono style={{ color: result.compliance.rg1 ? 'var(--safe)' : 'var(--danger)' }}>{result.compliance.rg1 ? '✓ OK' : '✗'}</TdMono>
                   </tr>
                   <tr>
                     <TdMono>Uso general</TdMono><TdMono>{result.Rc.toFixed(3)} Ω</TdMono><TdMono>≤ 5 Ω</TdMono>
-                    <TdMono style={{ color: result.compliance.rg5 ? 'var(--green)' : 'var(--red)' }}>{result.compliance.rg5 ? '✓ OK' : '✗'}</TdMono>
+                    <TdMono style={{ color: result.compliance.rg5 ? 'var(--safe)' : 'var(--danger)' }}>{result.compliance.rg5 ? '✓ OK' : '✗'}</TdMono>
                   </tr>
                 </tbody>
               </table>
             </div>
+            {result.rhoUsado !== undefined && (
+              <div style={{ fontSize: 10, color: 'var(--faint)' }}>
+                ρ usada: {result.rhoUsado.toFixed(1)} Ω·m{result.gelInfo?.activo ? ' (con gel)' : ''}
+              </div>
+            )}
+
+            <DiagnosisPanel
+              checks={complianceChecks}
+              diagnosis={diagnosis}
+              dataQuality={dataQuality}
+              onOptimize={optimize}
+              optimizing={optimizing}
+              optimizeResult={optimizeResult}
+              onApplySuggested={applySuggested}
+              targetLabel={result.compliance.rg1 ? 'Rc ≤ 1 Ω' : 'Rc ≤ 5 Ω'}
+              methodNote="El motor prueba, en orden de menor costo, agregar picas, luego alargarlas, luego ampliar la longitud total y el área de la malla — reteniendo solo cambios que reducen Rc. Al aplicar la sugerencia, largo y ancho se escalan proporcionalmente para alcanzar la nueva área."
+            />
           </>
         )}
       </main>

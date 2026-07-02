@@ -1,13 +1,20 @@
 'use client';
 import { useState } from 'react';
-import { api, type RodResult } from '@/lib/api';
+import { api, type RodResult, type RodOptimizeResult } from '@/lib/api';
 import {
   Field, SectionLabel, StatCard, CompBanner,
   calcLayout, inputStyle, panelStyle, Th, TdMono,
 } from '@/components/ui/CalcShared';
 import { ExportBar } from '@/components/ui/ExportBar';
+import { SoilRhoField } from '@/components/ui/SoilRhoField';
+import { GelPanel } from '@/components/ui/GelPanel';
+import { ConductorPanel } from '@/components/ui/ConductorPanel';
+import { DiagnosisPanel, type ComplianceCheck } from '@/components/ui/DiagnosisPanel';
+import { FaultCurrentField } from '@/components/ui/FaultCurrentField';
+import { useFaultAnalysis } from '@/context/FaultAnalysisContext';
+import type { GelParams } from '@/lib/api';
 
-const DEFAULTS = { rho: 110, L: 3, diamMm: 16, n: 4, spacing: 6, iFalla: 8500 };
+const DEFAULTS = { rho: 110, L: 3, diamMm: 16, n: 4, spacing: 6, iFalla: 8500, tFalla: 0.5 };
 
 function RodDiagram({ n, L }: { n: number; L: number }) {
   const W = 320, H = 200;
@@ -42,28 +49,72 @@ function RodDiagram({ n, L }: { n: number; L: number }) {
 }
 
 export function RodClient() {
+  const faultAnalysis = useFaultAnalysis();
   const [form, setForm] = useState(DEFAULTS);
+  const [gel, setGel] = useState<GelParams | null>(null);
   const [result, setResult] = useState<RodResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [optimizing, setOptimizing] = useState(false);
+  const [optimizeResult, setOptimizeResult] = useState<RodOptimizeResult | null>(null);
 
   const set = (k: keyof typeof DEFAULTS) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [k]: parseFloat(e.target.value) || 0 }));
 
+  function radiusOf() { return (form.diamMm / 1000) / 2; }
+
   async function calculate() {
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setOptimizeResult(null);
     try {
       const res = await api.grid.rod({
         rho: form.rho, L: form.L,
-        radius: (form.diamMm / 1000) / 2,
+        radius: radiusOf(),
         n: Math.round(form.n), spacing: form.spacing, iFalla: form.iFalla,
+        ...(gel ? { gel } : {}),
       });
       setResult(res);
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
   }
 
+  async function optimize() {
+    if (!result) return;
+    setOptimizing(true);
+    try {
+      const targetRg = result.compliance.rg1 ? 1 : 5;
+      const r = await api.grid.rodOptimize({
+        rho: form.rho, L: form.L, radius: radiusOf(), n: Math.round(form.n),
+        spacing: form.spacing, iFalla: form.iFalla, targetRg,
+        ...(gel ? { gel } : {}),
+      });
+      setOptimizeResult(r);
+    } catch (e) { setError((e as Error).message); }
+    finally { setOptimizing(false); }
+  }
+
+  function applySuggested() {
+    if (!optimizeResult) return;
+    const s = optimizeResult.suggested;
+    setForm(f => ({ ...f, rho: s.rho, L: s.L, diamMm: Math.round(s.radius * 2000 * 10) / 10, n: s.n, spacing: s.spacing, iFalla: s.iFalla }));
+    setOptimizeResult(null);
+  }
+
   const pass = result ? (result.compliance.rg1 || result.compliance.rg5) : null;
+
+  const complianceChecks: ComplianceCheck[] = result ? [
+    { label: 'Rn ≤ 1 Ω (subestaciones críticas)', pass: result.compliance.rg1, detail: `Rn calculada = ${result.Rn.toFixed(3)} Ω.` },
+    { label: 'Rn ≤ 5 Ω (uso general)', pass: result.compliance.rg5, detail: `Rn calculada = ${result.Rn.toFixed(3)} Ω.` },
+  ] : [];
+  const diagnosis: string[] = [];
+  const dataQuality: string[] = [];
+  if (result && !result.compliance.rg1) {
+    diagnosis.push(`Rn = ${result.Rn.toFixed(3)} Ω supera 1 Ω porque la resistencia mutua entre picas (Rm = ${result.Rm.toFixed(3)} Ω) no se reduce lo suficiente con la separación actual (${form.spacing} m); Rn = (R1 + (n-1)·Rm) / n.`);
+    if (form.spacing < 2 * form.L) diagnosis.push(`La separación entre picas (${form.spacing} m) es menor a 2×L (${(2 * form.L).toFixed(1)} m); a menor separación, mayor acoplamiento mutuo y menor beneficio de agregar picas adicionales.`);
+    if (form.n < 6) diagnosis.push(`Solo hay ${Math.round(form.n)} picas configuradas; agregar picas en paralelo reduce Rn de forma aproximadamente proporcional a 1/n para separaciones adecuadas.`);
+  }
+  if (result && result.rhoUsado !== undefined && result.rhoUsado > 500) {
+    dataQuality.push(`ρ = ${result.rhoUsado.toFixed(0)} Ω·m es inusualmente alto; revisa las mediciones de campo antes de dimensionar en base a este valor.`);
+  }
 
   return (
     <div style={calcLayout}>
@@ -72,15 +123,13 @@ export function RodClient() {
         <ExportBar
           module="rod"
           inputs={{ ...form }}
-          outputs={result ?? {}}
+          outputs={(result ?? {}) as unknown as Record<string,unknown>}
           norm="Dwight (1936) — IEEE 80-2013 Annex B.1"
         />
 
         <div style={panelStyle}>
           <SectionLabel>Electrodo</SectionLabel>
-          <Field label="Resistividad del suelo ρ (Ω·m)">
-            <input style={inputStyle} type="number" value={form.rho} onChange={set('rho')} />
-          </Field>
+          <SoilRhoField value={form.rho} onChange={v => setForm(f => ({ ...f, rho: v }))} />
           <Field label="Longitud de pica L (m)">
             <input style={inputStyle} type="number" value={form.L} step="0.5" onChange={set('L')} />
           </Field>
@@ -97,19 +146,25 @@ export function RodClient() {
           <Field label="Separación entre picas s (m)">
             <input style={inputStyle} type="number" value={form.spacing} step="0.5" onChange={set('spacing')} />
           </Field>
-          <Field label="Corriente de falla Ig (A)">
-            <input style={inputStyle} type="number" value={form.iFalla} onChange={set('iFalla')} />
+          <FaultCurrentField onSync={v => setForm(f => ({ ...f, iFalla: v }))} />
+          <Field label="Tiempo de despeje (s)">
+            <input style={inputStyle} type="number" step="0.1" value={form.tFalla} onChange={set('tFalla')} />
           </Field>
+        </div>
+
+        <div style={panelStyle}>
+          <GelPanel rhoSuelo={form.rho} onChange={setGel} />
+          <ConductorPanel iFalla={form.iFalla} tFalla={form.tFalla} onChange={(diamMm) => setForm(f => ({ ...f, diamMm: Math.round(diamMm * 10) / 10 }))} />
         </div>
 
         <button
           onClick={calculate}
-          disabled={loading}
-          style={{ padding: '10px 0', background: 'var(--copper)', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: loading ? .6 : 1 }}
+          disabled={loading || !faultAnalysis.result}
+          style={{ padding: '10px 0', background: 'var(--copper)', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: (loading || !faultAnalysis.result) ? .6 : 1 }}
         >
           {loading ? 'Calculando…' : 'Calcular'}
         </button>
-        {error && <div style={{ color: 'var(--red)', fontSize: 12 }}>{error}</div>}
+        {error && <div style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</div>}
       </aside>
 
       {/* ── RIGHT: results ── */}
@@ -123,6 +178,7 @@ export function RodClient() {
             <CompBanner
               pass={!!pass}
               label={pass ? `Rn = ${result.Rn.toFixed(3)} Ω — cumple IEEE 80` : `Rn = ${result.Rn.toFixed(3)} Ω — no cumple (> 5 Ω)`}
+              norm="Dwight/Sunde (1949) — IEEE 80-2013"
             />
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
@@ -140,6 +196,9 @@ export function RodClient() {
                   <tr><TdMono>Rm (mutua)</TdMono><TdMono>{result.Rm.toFixed(4)} Ω</TdMono><TdMono>Sunde 1949</TdMono></tr>
                   <tr><TdMono>Rₙ total</TdMono><TdMono>{result.Rn.toFixed(4)} Ω</TdMono><TdMono>paralelo</TdMono></tr>
                   <tr><TdMono>GPR</TdMono><TdMono>{result.gpr.toFixed(0)} V</TdMono><TdMono>Rn × Ig</TdMono></tr>
+                  {result.rhoUsado !== undefined && (
+                    <tr><TdMono>ρ usada</TdMono><TdMono>{result.rhoUsado.toFixed(1)} Ω·m{result.gelInfo?.activo ? ' (con gel)' : ''}</TdMono><TdMono>—</TdMono></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -153,7 +212,7 @@ export function RodClient() {
                     <TdMono>Subestaciones críticas</TdMono>
                     <TdMono>{result.Rn.toFixed(3)} Ω</TdMono>
                     <TdMono>≤ 1 Ω</TdMono>
-                    <TdMono style={{ color: result.compliance.rg1 ? 'var(--green)' : 'var(--red)' }}>
+                    <TdMono style={{ color: result.compliance.rg1 ? 'var(--safe)' : 'var(--danger)' }}>
                       {result.compliance.rg1 ? '✓ OK' : '✗'}
                     </TdMono>
                   </tr>
@@ -161,13 +220,25 @@ export function RodClient() {
                     <TdMono>Uso general</TdMono>
                     <TdMono>{result.Rn.toFixed(3)} Ω</TdMono>
                     <TdMono>≤ 5 Ω</TdMono>
-                    <TdMono style={{ color: result.compliance.rg5 ? 'var(--green)' : 'var(--red)' }}>
+                    <TdMono style={{ color: result.compliance.rg5 ? 'var(--safe)' : 'var(--danger)' }}>
                       {result.compliance.rg5 ? '✓ OK' : '✗'}
                     </TdMono>
                   </tr>
                 </tbody>
               </table>
             </div>
+
+            <DiagnosisPanel
+              checks={complianceChecks}
+              diagnosis={diagnosis}
+              dataQuality={dataQuality}
+              onOptimize={optimize}
+              optimizing={optimizing}
+              optimizeResult={optimizeResult}
+              onApplySuggested={applySuggested}
+              targetLabel={result.compliance.rg1 ? 'Rn ≤ 1 Ω' : 'Rn ≤ 5 Ω'}
+              methodNote="El motor prueba, en orden de menor costo, agregar picas, luego alargarlas, luego aumentar la separación entre ellas (reduce el acoplamiento mutuo Rm) — reteniendo solo cambios que efectivamente reducen Rn."
+            />
           </>
         )}
       </main>
